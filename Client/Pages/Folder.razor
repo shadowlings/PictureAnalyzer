@@ -1,0 +1,295 @@
+﻿@page "/folder/{FolderId}"
+
+@using Microsoft.AspNetCore.Authorization
+@using PictureAnalyzer.Common
+@using PictureAnalyzer.Common.Enumerations
+@using Azure.Storage.Blobs
+@using Azure.Storage.Blobs.Models
+@using Azure.Storage
+
+@inject PictureAnalyzer.Client.Services.API API
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject NavigationManager _navigationManager
+@inject IToastService _toastService
+@inject IModalService _modalService
+@inject SpinnerService _spinnerService
+
+@if (SelectedFolder != null)
+{
+    <div class="mb-3">
+        <NavLink href="@($"folders")">
+            &#171; Back to Folders
+        </NavLink>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <h3 class="mb-2">@SelectedFolder.Name 
+                @if (SelectedFolder.AllowEdit)
+                {
+                    <a href="folder/@(SelectedFolder.Id)/settings" class="ms-2 folderSettingsCog"><i class="fas fa-cog"></i></a>
+                }
+            </h3>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-3 mt-1">
+            @*<button class="btn btn-primary w-100"><i class="fas fa-plus me-2"></i>Add Files</button>*@
+            <label class="btn btn-primary w-100">
+                <i class="fas fa-plus me-2"></i>
+                <InputFile OnChange="UploadFolderItems" style="display:none;" multiple /> Add Files
+            </label>
+        </div>
+        <div class="col-md-3 mt-1">
+            <button class="btn btn-success w-100"><i class="fas fa-chart-bar me-2"></i>Analyze Files</button>
+        </div>
+    </div>
+    @if (UploadProgress > 0)
+    {
+        <div class="row mt-1">
+            <div class="col-md-12">
+                <div class="progress" style="height: 20px;">
+                    <div class="progress-bar bg-info" role="progressbar" aria-valuenow="@(UploadProgress)" aria-valuemin="0" aria-valuemax="100" style="color: black; width: @(UploadProgress)%">@($"{UploadProgress.ToString("0")}% Uploading {UploadFileIndex + 1} of {UploadFileTotal}")</div>
+                </div>
+            </div>
+        </div>
+    }
+    <div class="row mt-1">
+        <div class="col-md-12">
+            <form class="input-group float-end" @onsubmit="(() => SearchFolderItems(0, false))">
+                <input type="text" class="form-control" aria-label="Text input with dropdown button" @bind="Search.FilterText" />
+                <div class="input-group-append">
+                    <button class="btn btn-outline-secondary" type="submit"><i class="fas fa-search me-2"></i>Search</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="row mt-1">
+        <div class="col-md-12">
+            <div class="btn btn-link btn-sm float-end pointer" @onclick="(() => SearchFolderItems(0, true))">Reset Search</div>
+        </div>
+    </div>
+    
+<div class="row">
+    <div class="col-md-12">
+        <nav aria-label="Page navigation example">
+            <ul class="pagination float-end">
+                @if ((Search.Page + 1) > 1)
+                {
+                    <li class="page-item pointer"><div class="page-link" @onclick="(() => SearchFolderItems(Search.Page - 1, false))">Previous</div></li>
+                }
+                <li class="page-item"><div class="page-link">Page @(TotalFound == 0 ? 0 : (Search.Page + 1)) of @(Math.Ceiling((double)TotalFound / PageSize))</div></li>
+                @if ((Search.Page + 1) < (Math.Ceiling((double)TotalFound / PageSize)))
+                {
+                    <li class="page-item pointer"><div class="page-link" @onclick="(() => SearchFolderItems(Search.Page + 1, false))">Next</div></li>
+                }
+            </ul>
+        </nav>
+    </div>
+</div>
+<div class="row">
+    <div class="col-md-12 table-responsive">
+        <table class="table table-sm table-hover">
+            <thead>
+                <tr>
+                    <th width="50%" scope="col" @onclick="(() => Sort(nameof(Common.FolderItem.PrettyFileName)))" class="pointer">
+                        Name
+                        @if (Search.SortBy == nameof(Common.FolderItem.PrettyFileName))
+                        {
+                            @if (Search.SortDirection == SortDirection.Ascending)
+                            {
+                                <i class="fas fa-angle-down"></i>
+                            }
+                            else if (Search.SortDirection == SortDirection.Descending)
+                            {
+                                <i class="fas fa-angle-up"></i>
+                            }
+                        }
+                    </th>
+                    <th width="50%" scope="col" @onclick="(() => Sort(nameof(Common.FolderItem.FileSize)))" class="pointer">
+                        Size
+                        @if (Search.SortBy == nameof(Common.FolderItem.FileSize))
+                        {
+                            @if (Search.SortDirection == SortDirection.Ascending)
+                            {
+                                <i class="fas fa-angle-down"></i>
+                            }
+                            else if (Search.SortDirection == SortDirection.Descending)
+                            {
+                                <i class="fas fa-angle-up"></i>
+                            }
+                        }
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Items)
+                {
+                    <tr class="pointer">
+                        <td>
+                            <div class="btn btn-link" @onclick="() => SelectFolderItem(FolderId, item.Id)">@item.PrettyFileName</div>
+                        </td>
+                        <td>
+                            <div class="mt-2">@item.FileSize.BytesToString()</div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+<div class="row">
+    <div class="col-md-12">
+        <nav aria-label="Page navigation example">
+            <ul class="pagination float-end">
+                @if ((Search.Page + 1) > 1)
+                {
+                    <li class="page-item pointer"><div class="page-link" @onclick="(() => SearchFolderItems(Search.Page - 1, false))">Previous</div></li>
+                }
+                <li class="page-item"><div class="page-link">Page @(TotalFound == 0 ? 0 : (Search.Page + 1)) of @(Math.Ceiling((double)TotalFound / PageSize))</div></li>
+                @if ((Search.Page + 1) < (Math.Ceiling((double)TotalFound / PageSize)))
+                {
+                    <li class="page-item pointer"><div class="page-link" @onclick="(() => SearchFolderItems(Search.Page + 1, false))">Next</div></li>
+                }
+            </ul>
+        </nav>
+    </div>
+</div>
+<div class="row mt-1">
+    <div class="col-md-12">
+        <label class="float-end search-found">Found @TotalFound.ToString("N0")</label>
+    </div>
+</div>
+
+}
+
+@code {
+
+
+    [Parameter]
+    public string FolderId { get; set; }
+    private Common.Folder SelectedFolder { get; set; }
+
+
+    private Search Search { get; set; } = new Search();
+    int PageSize { get; set; } = 15;
+
+    List<Common.FolderItem> Items = new List<Common.FolderItem>();
+    int TotalFound { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        //Load the folder details
+        if (!string.IsNullOrEmpty(FolderId))
+        {
+            SelectedFolder = await API.FolderGetById(FolderId);
+        }
+
+        //Initialize the search of folder items
+        var cachedSearch = await localStorage.GetItemAsync<Search>($"FolderSearch");
+        if (cachedSearch == null)
+        {
+            await SearchFolderItems(0, true);
+        }
+        else
+        {
+            Search = cachedSearch;
+            await SearchFolderItems(Search.Page, false);
+        }
+    }
+
+    async private Task SearchFolderItems(int? page, bool reset)
+    {
+        if (reset == true)
+        {
+            Search = new Search();
+            Search.SortBy = nameof(PictureAnalyzer.Common.FolderItem.BlobId);
+            page = null;
+        }
+
+        Search = new Search()
+        {
+            FilterText = string.IsNullOrEmpty(Search?.FilterText) ? null : Search?.FilterText,
+            Page = page == null ? Search.Page : (int)page,
+            PageSize = PageSize,
+            SortBy = Search.SortBy,
+            SortDirection = Search.SortDirection
+        };
+
+        await localStorage.SetItemAsync($"FolderSearch", Search);
+
+        var response = await API.FolderItemSearch(Search, FolderId);
+        Items = response.Data;
+        TotalFound = response.Total;
+    }
+
+    async private Task Sort(string column)
+    {
+        Search.SortBy = column;
+        Search.SortDirection = Search.SortDirection == SortDirection.Ascending ? SortDirection.Descending : SortDirection.Ascending;
+
+        await SearchFolderItems(Search.Page, false);
+    }
+
+    private void SelectFolderItem(string folderId, string folderItemId)
+    {
+        _navigationManager.NavigateTo($"folder/{folderId}/item/{folderItemId}");
+    }
+
+    //https://stackoverflow.com/questions/65808332/uploading-file-from-blazor-webassembly-app-directly-to-blob-storage
+    private int MaxAllowedFiles = 10000;
+    private int MaxAllowedSize = 1000 * 1024 * 1024;
+    private decimal UploadProgress { get; set; }
+    private int UploadFileTotal { get; set; }
+    private int UploadFileIndex { get; set; }
+    async private Task UploadFolderItems(InputFileChangeEventArgs e)
+    {
+        UploadFileTotal = e.FileCount;
+        foreach (var file in e.GetMultipleFiles(MaxAllowedFiles))
+        {
+            var blobUri = await API.FolderItemGenerateUploadSasUri(FolderId);
+
+            BlobClient blobClient = new BlobClient(blobUri.Sas, new BlobClientOptions());
+
+            var res = await blobClient.UploadAsync(file.OpenReadStream(MaxAllowedSize), new BlobUploadOptions
+            {
+                HttpHeaders = new BlobHttpHeaders { ContentType = file.ContentType },
+                TransferOptions = new StorageTransferOptions
+                {
+                    InitialTransferSize = 1024 * 1024,
+                    MaximumConcurrency = 10
+                },
+                ProgressHandler = new Progress<long>((progress) =>
+                {
+                    UploadProgress = ((((decimal)progress)/((decimal)file.Size)/e.FileCount)+((decimal)UploadFileIndex/(decimal)(e.FileCount))) * 100;
+                })
+            });
+
+            Common.UploadFolderItem upload = new UploadFolderItem()
+            {
+                PrettyFileName = file.Name,
+                MimeType = file.ContentType,
+                BlobId = blobUri.BlobId,
+                FileSize = file.Size
+            };
+            var response = await API.FolderItemCreate(upload, FolderId);
+            //Only add the newly uploaded file when there is room on the current page.
+            if (response != null && Items.Count < Search.PageSize)
+            {
+                Items.Add(response);
+                TotalFound++;
+            }
+
+            UploadFileIndex++;
+
+            StateHasChanged();
+        }
+
+        //Reset progress bar
+        UploadFileTotal = 0;
+        UploadFileIndex = 0;
+        UploadProgress = 0;
+
+        _toastService.ShowSuccess("Upload Completed");
+    }
+}
