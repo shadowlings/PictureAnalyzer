@@ -1,9 +1,10 @@
 [![CI/CD Azure App Service](https://github.com/shadowlings/PictureAnalyzer/actions/workflows/main_picturesanalyzer.yml/badge.svg)](https://github.com/shadowlings/PictureAnalyzer/actions/workflows/main_picturesanalyzer.yml)
+[![CI/CD Azure Function](https://github.com/shadowlings/PictureAnalyzer/actions/workflows/main_picturesanalyzerfunction.yml/badge.svg)](https://github.com/shadowlings/PictureAnalyzer/actions/workflows/main_picturesanalyzerfunction.yml)
 
 # PictureAnalyzer
 
 ### Demo:
-No demo yet. The application works, but I'm not ready to deploy it yet.
+https://pictures.shadowlings.com
 
 ### Setup:
 Clone the repo. Auth0 settings are set in the appSettings.json files. This public repo does not include those values - set those values using your specific Auth0 values/id's. On the initial startup of the application, be sure the DB is correctly created. You will need MSSQL Server installed (I use MSSQL Developer Edition). Assuming the connection string is correct in appSettings.json, the application should create the DB on startup.
