@@ -7,6 +7,8 @@
 https://pictures.shadowlings.com
 
 ### Setup:
+This application requires a SQL DB, Azure Storage, Azure Cognitive Services, Azure Function, and Auth0.
+
 Clone the repo. Auth0 settings are set in the appSettings.json files. This public repo does not include those values - set those values using your specific Auth0 values/id's. On the initial startup of the application, be sure the DB is correctly created. You will need MSSQL Server installed (I use MSSQL Developer Edition). Assuming the connection string is correct in appSettings.json, the application should create the DB on startup.
 
 ### Startup:
