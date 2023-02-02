@@ -1,3 +1,5 @@
+[![CI/CD Azure App Service](https://github.com/shadowlings/PictureAnalyzer/actions/workflows/main_picturesanalyzer.yml/badge.svg)](https://github.com/shadowlings/PictureAnalyzer/actions/workflows/main_picturesanalyzer.yml)
+
 # PictureAnalyzer
 
 ### Demo:
@@ -20,4 +22,3 @@ Sensative configuration data, such as the DB connection strings, or Azure B2C co
  - git update-index --assume-unchanged .\Client\wwwroot\appsettings.json
  - use '--no-assume-unchanged' to reverse the ignore.
 
-##### 42022.2
